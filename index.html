@@ -290,6 +290,8 @@ let queue = [];           // what's left of the current shuffled loop
 let current = null;
 let errorsInRow = 0;
 let playlistLoading = false;
+let userPaused = false;   // only true when paused with P / the button; anything else gets auto-resumed
+const WATCHDOG_MS = 5000;
 
 function shuffle(list, notFirst) {
   const a = [...list];
@@ -322,6 +324,7 @@ async function playNext() {
     if (!tracks.length) { $("track").textContent = "no .mp3 files in MUSIC_DIR"; return; }
     queue = shuffle(tracks, current);
   }
+  userPaused = false;
   current = queue.shift();
   audio.src = current.url;
   $("track").textContent = current.name;
@@ -330,7 +333,13 @@ async function playNext() {
 }
 
 function togglePlay() {
-  if (audio.paused) tryPlay(); else audio.pause();
+  userPaused = !audio.paused;
+  if (userPaused) audio.pause(); else tryPlay();
+}
+
+function resumeIfInterrupted() {
+  // the OS/browser paused us (e.g. the HDMI audio device vanished when the TV went off)
+  if (current && audio.paused && !audio.ended && !userPaused) tryPlay();
 }
 
 async function loadPlaylist() {
@@ -359,7 +368,7 @@ audio.addEventListener("error", () => {
 if ("mediaSession" in navigator) {
   // hardware/remote media keys arrive here rather than as keydown events
   navigator.mediaSession.setActionHandler("play", tryPlay);
-  navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+  navigator.mediaSession.setActionHandler("pause", () => { userPaused = true; audio.pause(); });
   navigator.mediaSession.setActionHandler("nexttrack", playNext);
 }
 
@@ -399,6 +408,9 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "p" || e.key === "P") togglePlay();
   else if (e.key === "n" || e.key === "N") playNext();
 });
+
+setInterval(resumeIfInterrupted, WATCHDOG_MS);
+navigator.mediaDevices?.addEventListener("devicechange", () => setTimeout(resumeIfInterrupted, 1000));
 
 tick();
 setInterval(tick, 1000);
