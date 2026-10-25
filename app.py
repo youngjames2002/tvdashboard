@@ -1,5 +1,6 @@
 import datetime as dt
 import os
+import json
 
 import icalendar
 import recurring_ical_events
@@ -10,6 +11,8 @@ from pathlib import Path
 from fastapi.responses import FileResponse
 
 ICAL_URL = os.environ["GCAL_ICAL_URL"] 
+BASE_DIR = Path(__file__).parent
+SPORTS_FILE = BASE_DIR / "sports.json"
 
 app = FastAPI()
 
@@ -39,6 +42,15 @@ def get_events(days: int = 30, limit: int = 10):
             "summary": str(ev.get("SUMMARY", "(no title)")),
         })
     return events
+
+@app.get("/sports")
+def get_sports():
+    # Written by fetch_sports.py on cron; this endpoint only reads it
+    try:
+        return json.loads(SPORTS_FILE.read_text())
+    except FileNotFoundError:
+        raise HTTPException(status_code=503, detail="sports.json not generated yet; run fetch_sports.py")
+
 
 @app.get("/")
 def index():

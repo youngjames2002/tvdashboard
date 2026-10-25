@@ -3,119 +3,193 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Upcoming Events</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Crect x='1' y='1' width='14' height='4' fill='%231a1aff'/%3E%3Crect x='3' y='2' width='10' height='2' fill='%23ffff2a'/%3E%3Crect x='1' y='7' width='3' height='2' fill='%232aff2a'/%3E%3Crect x='5' y='7' width='10' height='2' fill='%23f4f4f4'/%3E%3Crect x='1' y='10' width='3' height='2' fill='%232aff2a'/%3E%3Crect x='5' y='10' width='7' height='2' fill='%23f4f4f4'/%3E%3Crect x='1' y='13' width='3' height='2' fill='%23ff2a2a'/%3E%3Crect x='5' y='13' width='3' height='2' fill='%232aff2a'/%3E%3Crect x='9' y='13' width='3' height='2' fill='%23ffff2a'/%3E%3Crect x='13' y='13' width='2' height='2' fill='%232affff'/%3E%3C/svg%3E">
+<title>pascal@homeserver</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23020a1a'/%3E%3Cpath d='M3 5l3 3-3 3' fill='none' stroke='%236cc8ff' stroke-width='1.6'/%3E%3Crect x='8' y='10' width='5' height='1.6' fill='%23d8f1ff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
 <style>
-  /* The teletext palette: eight colours, nothing in between */
+  /* Blue-phosphor CRT: one hue, three intensities */
   :root {
-    --black: #000;
-    --red: #ff2a2a;
-    --green: #2aff2a;
-    --yellow: #ffff2a;
-    --blue: #1a1aff;
-    --cyan: #2affff;
-    --white: #f4f4f4;
+    --bg: #020a1a;
+    --phos: #6cc8ff;
+    --bright: #d8f1ff;
+    --dim: #2f5f99;
+    --faint: rgba(108, 200, 255, 0.14);
   }
+  html { font-size: 3.4vh; }  /* scales with the screen; ~37px base on 1080p */
   * { box-sizing: border-box; margin: 0; }
-  html, body { height: 100%; background: var(--black); }
   body {
-    color: var(--white);
+    height: 100vh;
+    overflow: hidden;
+    background: #000;
+    color: var(--phos);
     font-family: "VT323", ui-monospace, monospace;
-    font-size: 6.5vh;            /* ~14 rows on screen: readable from across the room */
-    overflow: hidden;            /* never show a scrollbar on the TV */
-    line-height: 1.1;
-    display: flex;
-    justify-content: center;
-    padding: 3vh 2vw;
-    text-shadow: 0 0 0.15em currentColor;   /* phosphor glow */
+    font-size: 1.25rem;
+    line-height: 1.15;
   }
-  /* CRT scanlines and vignette, laid over everything */
-  body::after {
+
+  /* ---- The tube ---- */
+  .screen {
+    position: relative;
+    height: 100vh;
+    padding: 3vh 3.5vw;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 2vh;
+    background: radial-gradient(ellipse at 50% 45%, #06204a 0%, var(--bg) 70%);
+    border-radius: 2.2rem / 1.8rem;  /* rounded glass corners */
+    box-shadow: inset 0 0 6rem rgba(0, 0, 0, 0.9), inset 0 0 1.2rem rgba(108, 200, 255, 0.15);
+    text-shadow: 0 0 0.12em currentColor, 0 0 0.45em rgba(108, 200, 255, 0.45);
+    overflow: hidden;
+  }
+  .screen::before {  /* scanlines */
     content: "";
-    position: fixed;
+    position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.35) 2px 3px),
-      radial-gradient(ellipse at center, rgba(0,0,0,0) 60%, rgba(0,0,0,0.65) 100%);
+    background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.32) 0 2px, transparent 2px 4px);
+    z-index: 2;
   }
-  .page { width: 100%; max-width: 90ch; }
-  .row { white-space: nowrap; overflow: hidden; }
-
-  .header { display: flex; gap: 1ch; }
-  .header .page-no { color: var(--white); }
-  .header .service { color: var(--cyan); }
-  .header .date { margin-left: auto; color: var(--white); }
-  .header .clock { color: var(--yellow); }
-
-  /* Double-height title band: same width, twice as tall, as teletext did it */
-  .title {
-    background: var(--blue);
-    color: var(--yellow);
-    height: 2.2em;
-    margin: 0.6em 0 0.8em;
-    padding-left: 1ch;
+  .screen::after {  /* slow refresh band rolling down the glass */
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 25vh;
+    top: -25vh;
+    pointer-events: none;
+    background: linear-gradient(to bottom, transparent, rgba(108, 200, 255, 0.05), transparent);
+    animation: roll 9s linear infinite;
+    z-index: 3;
   }
-  .title span { display: inline-block; transform: scaleY(2); transform-origin: top; }
 
-  .day { color: var(--cyan); margin-top: 0.6em; }
-  .day.today { color: var(--yellow); }
-  .event { display: grid; grid-template-columns: 8ch 1fr; }
-  .event .time { color: var(--green); }
-  .event .now { animation: flash 1s steps(1) infinite; }
-  .empty { color: var(--white); }
+  .prompt { color: var(--dim); white-space: nowrap; }
+  .prompt .host { color: var(--phos); }
+  .prompt .cmd { color: var(--bright); }
 
-  .footer { display: flex; align-items: center; gap: 2ch; margin-top: 1em; }
-  .status { color: var(--green); }
-  /* Styled like a fastext key: solid red block, black text */
-  .refresh {
-    font: inherit;
-    background: var(--red);
-    color: var(--black);
-    text-shadow: none;
-    border: 0;
+  /* ---- Header: `date` output, big ---- */
+  .clock { display: flex; align-items: baseline; gap: 1.2ch; color: var(--bright); }
+  .clock .hhmm { font-size: 3.4rem; line-height: 1; }
+  .clock .ss { font-size: 1.8rem; color: var(--phos); }
+  .clock .date { font-size: 1.8rem; color: var(--phos); margin-left: 1ch; }
+
+  /* ---- Two panes, tmux-split style ---- */
+  main { display: grid; grid-template-columns: 1.25fr 1fr; gap: 2.5vw; min-height: 0; }
+  .pane {
+    position: relative;
+    min-height: 0;
+    padding: 1.1rem 1.2ch 0.6rem;
+    border: 0.12rem solid var(--dim);
+    box-shadow: 0 0 0.8rem rgba(108, 200, 255, 0.12), inset 0 0 0.8rem rgba(108, 200, 255, 0.06);
+  }
+  .pane-title {
+    position: absolute;
+    top: -0.62em;
+    left: 1.5ch;
     padding: 0 1ch;
-    cursor: pointer;
+    background: var(--bg);
+    color: var(--bright);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
-  .refresh:focus-visible { outline: 0.12em solid var(--white); outline-offset: 0.12em; }
-  .refresh:disabled { opacity: 0.5; cursor: wait; }
-  .status.error { color: var(--red); }
+  .pane .prompt { margin-bottom: 0.4rem; }
+  .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  @keyframes flash { 50% { visibility: hidden; } }
-  @media (prefers-reduced-motion: reduce) { .event .now { animation: none; } }
+  .day { color: var(--bright); margin-top: 0.45rem; }
+  .day::before { content: "## "; color: var(--dim); }
+  .event .time { display: inline-block; width: 8ch; color: var(--phos); }
+  .event .title { color: var(--bright); }
+  .now { animation: blink 1s steps(1) infinite; }
+  .inverse { background: var(--phos); color: var(--bg); text-shadow: none; padding: 0 0.5ch; }
+
+  .team { margin-bottom: 0.55rem; }
+  .team-name { color: var(--bright); text-transform: uppercase; letter-spacing: 0.05em; }
+  .team-name .stale { color: var(--dim); text-transform: none; }
+  .team .line { padding-left: 2ch; }
+  .key { display: inline-block; width: 5ch; color: var(--dim); }
+  .res { display: inline-block; width: 3ch; text-align: center; margin-right: 1ch; }
+  .res.L { color: var(--dim); }
+  .res.D { outline: 1px solid var(--phos); }
+  .muted { color: var(--dim); }
+
+  /* ---- Footer: function key + live prompt ---- */
+  footer { display: flex; align-items: center; gap: 2ch; white-space: nowrap; }
+  .btn {
+    font: inherit;
+    color: var(--bright);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-shadow: inherit;
+  }
+  .btn:hover, .btn:focus-visible { background: var(--phos); color: var(--bg); text-shadow: none; outline: none; }
+  .btn:disabled { color: var(--dim); cursor: wait; }
+  .status { color: var(--dim); }
+  .status.error { color: var(--bright); }
+  .status.error::before { content: "ERR "; background: var(--bright); color: var(--bg); text-shadow: none; padding: 0 0.5ch; margin-right: 1ch; }
+  .cursor { animation: blink 1.05s steps(1) infinite; color: var(--bright); }
+
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes roll { to { top: 100vh; } }
+  @media (prefers-reduced-motion: reduce) {
+    .now, .cursor, .screen::after { animation: none; }
+  }
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="row header">
-    <span class="page-no">P101</span>
-    <span class="service">Calendar</span>
-    <span class="date" id="date"></span>
-    <span class="clock" id="clock"></span>
-  </div>
-  <div class="row title"><span>Upcoming Events</span></div>
-  <div id="events"></div>
-  <div class="row footer">
-    <button class="refresh" id="refresh" type="button">Refresh</button>
-    <span class="status" id="status">Searching for page 101…</span>
-  </div>
+<div class="screen">
+  <header>
+    <div class="prompt"><span class="host">pascal@homeserver</span>:~$ <span class="cmd">date</span></div>
+    <div class="clock">
+      <span class="hhmm" id="hhmm">--:--</span><span class="ss" id="ss">:--</span>
+      <span class="date" id="date"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="pane">
+      <span class="pane-title">Upcoming Events</span>
+      <div class="prompt">$ <span class="cmd">cal --upcoming</span></div>
+      <div id="events"><div class="muted">loading...</div></div>
+    </section>
+    <section class="pane">
+      <span class="pane-title">Scores</span>
+      <div class="prompt">$ <span class="cmd">espn --teams</span></div>
+      <div id="sports"><div class="muted">loading...</div></div>
+    </section>
+  </main>
+
+  <footer>
+    <button class="btn" id="refresh" type="button">[F5] refresh</button>
+    <span class="status" id="status"></span>
+    <span class="prompt"><span class="host">pascal@homeserver</span>:~$ <span class="cursor">&#9608;</span></span>
+  </footer>
 </div>
 
 <script>
 const REFRESH_MS = 5 * 60 * 1000;
-const MAX_EVENTS = 6; // what fits on screen at this text size
+const MAX_EVENTS = 6;
 const fmtTime = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
-const fmtClock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-const fmtHeaderDate = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" });
 const fmtDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long" });
+const fmtShort = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" });
+const pad = (n) => String(n).padStart(2, "0");
+const $ = (id) => document.getElementById(id);
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text) node.textContent = text; // textContent, so titles can't inject HTML
+  return node;
+}
 
 function tick() {
   const now = new Date();
-  document.getElementById("date").textContent = fmtHeaderDate.format(now).replace(",", "");
-  document.getElementById("clock").textContent = fmtClock.format(now);
+  $("hhmm").textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  $("ss").textContent = `:${pad(now.getSeconds())}`;
+  $("date").textContent = fmtShort.format(now).replace(",", "");
 }
 
+/* ---------- Calendar ---------- */
 function parseStart(ev) {
   if (!ev.all_day) return new Date(ev.start);
   const [y, m, d] = ev.start.split("-").map(Number);
@@ -130,18 +204,11 @@ function dayLabel(date) {
   return fmtDay.format(date);
 }
 
-function el(tag, cls, text) {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text) node.textContent = text; // textContent, so event titles can't inject HTML
-  return node;
-}
-
-function render(events) {
-  const list = document.getElementById("events");
-  list.replaceChildren();
+function renderEvents(events) {
+  const box = $("events");
+  box.replaceChildren();
   if (!events.length) {
-    list.append(el("div", "row empty", "Nothing on in the next 30 days"));
+    box.append(el("div", "muted", "0 events in the next 30 days"));
     return;
   }
   const now = new Date();
@@ -150,41 +217,82 @@ function render(events) {
     const start = parseStart(ev);
     const label = dayLabel(start);
     if (label !== currentDay) {
-      list.append(el("div", "row day" + (label === "Today" ? " today" : ""), label));
+      box.append(el("div", "line day", label));
       currentDay = label;
     }
     const ongoing = !ev.all_day && start < now;
-    const time = ev.all_day ? "All day" : ongoing ? "Now" : fmtTime.format(start);
-    const row = el("div", "row event");
-    row.append(el("span", "time" + (ongoing ? " now" : ""), time), el("span", "", ev.summary));
-    list.append(row);
+    const time = el("span", "time");
+    time.append(ongoing ? el("span", "inverse now", "NOW") : document.createTextNode(ev.all_day ? "all-day" : fmtTime.format(start)));
+    const row = el("div", "line event");
+    row.append(time, el("span", "title", ev.summary));
+    box.append(row);
   }
+}
+
+/* ---------- Sports ---------- */
+const vsAt = (g) => `${g.home ? "vs" : "@ "} ${g.opponent}`;
+
+function lastLine(g) {
+  const line = el("div", "line");
+  line.append(el("span", "key", "last"));
+  if (!g) { line.append(el("span", "muted", "-- no result --")); return line; }
+  const res = el("span", "res " + (g.outcome || ""), g.outcome || "?");
+  if (g.outcome === "W") res.classList.add("inverse");
+  line.append(res, document.createTextNode(`${g.score_for}-${g.score_against}  ${vsAt(g)}`));
+  return line;
+}
+
+function nextLine(g) {
+  const line = el("div", "line");
+  line.append(el("span", "key", "next"));
+  if (!g) { line.append(el("span", "muted", "-- tbc --")); return line; }
+  const d = new Date(g.date);
+  line.append(document.createTextNode(`${fmtShort.format(d).replace(",", "")} ${fmtTime.format(d)}  ${vsAt(g)}`));
+  return line;
+}
+
+function renderSports(data) {
+  const box = $("sports");
+  box.replaceChildren();
+  for (const t of data.teams || []) {
+    const block = el("div", "team");
+    const name = el("div", "line team-name", t.short);
+    if (t.stale) name.append(el("span", "stale", "  (stale)"));
+    block.append(name, lastLine(t.last), nextLine(t.next));
+    box.append(block);
+  }
+}
+
+/* ---------- Loading ---------- */
+async function getJSON(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
 }
 
 async function load() {
-  const status = document.getElementById("status");
-  const button = document.getElementById("refresh");
+  const button = $("refresh");
   if (button.disabled) return; // a fetch is already running
   button.disabled = true;
-  status.textContent = "Searching…";
-  try {
-    const res = await fetch(`/events?limit=${MAX_EVENTS}`);
-    if (!res.ok) throw new Error(`server returned ${res.status}`);
-    render(await res.json());
-    status.className = "status";
-    status.textContent = "";
-  } catch (err) {
-    status.className = "status error";
-    status.textContent = `No signal: ${err.message}. Retrying in 5 min`;
-  } finally {
-    button.disabled = false;
-  }
+  const status = $("status");
+  status.className = "status";
+  status.textContent = "fetching...";
+
+  const [events, sports] = await Promise.allSettled([getJSON(`/events?limit=${MAX_EVENTS}`), getJSON("/sports")]);
+  const failed = [];
+  if (events.status === "fulfilled") renderEvents(events.value); else failed.push("calendar");
+  if (sports.status === "fulfilled") renderSports(sports.value); else failed.push("sports");
+
+  status.textContent = failed.length ? `${failed.join(" + ")} unreachable` : "";
+  status.classList.toggle("error", failed.length > 0);
+  button.disabled = false;
 }
 
-document.getElementById("refresh").addEventListener("click", load);
-// "R" on a keyboard, or the red colour key on remotes that pass it through (keyCode 403)
+$("refresh").addEventListener("click", load);
+// F5 is intercepted so it refetches data instead of reloading the page; also "R" and the remote's red key (403)
 document.addEventListener("keydown", (e) => {
-  if (e.key === "r" || e.key === "R" || e.key === "ColorF0Red" || e.keyCode === 403) load();
+  if (e.key === "F5") e.preventDefault();
+  if (["F5", "r", "R", "ColorF0Red"].includes(e.key) || e.keyCode === 403) load();
 });
 
 tick();
