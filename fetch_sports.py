@@ -13,7 +13,7 @@ BASE = "https://site.api.espn.com/apis/site/v2/sports"
 OUT = Path(__file__).parent / "sports.json"
 
 TEAMS = [
-    {"short": "Arsenal", "sport": "soccer", "league": "eng.1", "id": "359"},
+    {"short": "Arsenal", "sport": "soccer", "league": "all", "id": "359"},
     {"short": "Raiders", "sport": "football", "league": "nfl", "id": "13"},
     {"short": "76ers", "sport": "basketball", "league": "nba", "id": "20"},
 ]
