@@ -1,23 +1,28 @@
 import datetime as dt
 import os
 import json
+from pathlib import Path
+from urllib.parse import quote
 
 import icalendar
 import recurring_ical_events
 import requests
 from fastapi import FastAPI, HTTPException
-
-from pathlib import Path
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
-ICAL_URL = os.environ["GCAL_ICAL_URL"] 
+ICAL_URL = os.environ["GCAL_ICAL_URL"]
 BASE_DIR = Path(__file__).parent
 SPORTS_FILE = BASE_DIR / "sports.json"
+MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", BASE_DIR / "music"))
 
 app = FastAPI()
+app.mount("/music", StaticFiles(directory=MUSIC_DIR, check_dir=False), name="music")
+
 
 def _sort_key(start, tz):
     return start if isinstance(start, dt.datetime) else dt.datetime.combine(start, dt.time.min, tz)
+
 
 @app.get("/events")
 def get_events(days: int = 30, limit: int = 10):
@@ -43,15 +48,23 @@ def get_events(days: int = 30, limit: int = 10):
         })
     return events
 
+
 @app.get("/sports")
 def get_sports():
-    # Written by fetch_sports.py on cron; this endpoint only reads it
     try:
         return json.loads(SPORTS_FILE.read_text())
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="sports.json not generated yet; run fetch_sports.py")
 
 
+@app.get("/playlist")
+def get_playlist():
+    if not MUSIC_DIR.is_dir():
+        return []
+    files = sorted(f for f in MUSIC_DIR.iterdir() if f.is_file() and f.suffix.lower() == ".mp3")
+    return [{"name": f.name, "url": f"/music/{quote(f.name)}"} for f in files]
+
+
 @app.get("/")
 def index():
-    return FileResponse(Path(__file__).parent / "index.html")
+    return FileResponse(BASE_DIR / "index.html")

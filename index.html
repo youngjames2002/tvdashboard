@@ -66,7 +66,13 @@
   .prompt .host { color: var(--phos); }
   .prompt .cmd { color: var(--bright); }
 
-  /* ---- Header: `date` output, big ---- */
+  /* ---- Header: `date` on the left, music player on the right ---- */
+  header { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5vw; align-items: end; }
+  .music { min-width: 0; text-align: right; }
+  .music .line { font-size: 1.5rem; color: var(--bright); }
+  .note { color: var(--phos); }
+  #trackstate:empty { display: none; }
+  #trackstate { margin-right: 1ch; font-size: 1.1rem; vertical-align: middle; }
   .clock { display: flex; align-items: baseline; gap: 1.2ch; color: var(--bright); }
   .clock .hhmm { font-size: 3.4rem; line-height: 1; }
   .clock .ss { font-size: 1.8rem; color: var(--phos); }
@@ -143,10 +149,16 @@
 <body>
 <div class="screen">
   <header>
-    <div class="prompt"><span class="host">pascal@homeserver</span>:~$ <span class="cmd">date</span></div>
-    <div class="clock">
-      <span class="hhmm" id="hhmm">--:--</span><span class="ss" id="ss">:--</span>
-      <span class="date" id="date"></span>
+    <div>
+      <div class="prompt"><span class="host">pascal@homeserver</span>:~$ <span class="cmd">date</span></div>
+      <div class="clock">
+        <span class="hhmm" id="hhmm">--:--</span><span class="ss" id="ss">:--</span>
+        <span class="date" id="date"></span>
+      </div>
+    </div>
+    <div class="music">
+      <div class="prompt">$ <span class="cmd">mpv --shuffle --loop-playlist ~/music</span></div>
+      <div class="line"><span class="inverse" id="trackstate"></span><span class="note">&#9834;</span> <span id="track">loading...</span></div>
     </div>
   </header>
 
@@ -164,6 +176,8 @@
   </main>
 
   <footer>
+    <button class="btn" id="playpause" type="button">[P] play</button>
+    <button class="btn" id="next" type="button">[N] next</button>
     <button class="btn" id="refresh" type="button">[F5] refresh</button>
     <span class="status" id="status"></span>
     <span class="prompt"><span class="host">pascal@homeserver</span>:~$ <span class="cursor">&#9608;</span></span>
@@ -267,6 +281,88 @@ function renderSports(data) {
   }
 }
 
+/* ---------- Music ---------- */
+const VOLUME = 0.6;
+const audio = new Audio();
+audio.volume = VOLUME;
+let tracks = [];          // from /playlist
+let queue = [];           // what's left of the current shuffled loop
+let current = null;
+let errorsInRow = 0;
+let playlistLoading = false;
+
+function shuffle(list, notFirst) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  // don't play the same track twice in a row across a reshuffle
+  if (a.length > 1 && notFirst && a[0].url === notFirst.url) [a[0], a[1]] = [a[1], a[0]];
+  return a;
+}
+
+function setState(text) { $("trackstate").textContent = text; }
+function updateButton() { $("playpause").textContent = audio.paused ? "[P] play" : "[P] pause"; }
+
+async function tryPlay() {
+  if (!current) return playNext();
+  try {
+    await audio.play();
+  } catch (err) {
+    if (err.name === "NotAllowedError") setState("AUTOPLAY BLOCKED: PRESS P");
+  }
+  updateButton();
+}
+
+async function playNext() {
+  if (!queue.length) {
+    // new loop: re-read the folder so newly added files join in, then reshuffle
+    try { tracks = await getJSON("/playlist"); } catch { /* keep the old list */ }
+    if (!tracks.length) { $("track").textContent = "no .mp3 files in MUSIC_DIR"; return; }
+    queue = shuffle(tracks, current);
+  }
+  current = queue.shift();
+  audio.src = current.url;
+  $("track").textContent = current.name;
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: current.name });
+  await tryPlay();
+}
+
+function togglePlay() {
+  if (audio.paused) tryPlay(); else audio.pause();
+}
+
+async function loadPlaylist() {
+  if (playlistLoading || tracks.length) return;
+  playlistLoading = true;
+  try {
+    tracks = await getJSON("/playlist");
+    queue = [];
+    await playNext();
+  } catch {
+    $("track").textContent = "playlist unreachable";
+  } finally {
+    playlistLoading = false;
+  }
+}
+
+audio.addEventListener("playing", () => { errorsInRow = 0; setState(""); updateButton(); });
+audio.addEventListener("pause", () => { if (!audio.ended) setState("PAUSED"); updateButton(); });
+audio.addEventListener("ended", playNext);
+audio.addEventListener("error", () => {
+  // skip unplayable files, but stop if every track has failed in a row
+  if (++errorsInRow >= tracks.length) { setState("ALL TRACKS FAILED"); return; }
+  playNext();
+});
+
+if ("mediaSession" in navigator) {
+  // hardware/remote media keys arrive here rather than as keydown events
+  navigator.mediaSession.setActionHandler("play", tryPlay);
+  navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+  navigator.mediaSession.setActionHandler("nexttrack", playNext);
+}
+
 /* ---------- Loading ---------- */
 async function getJSON(url) {
   const res = await fetch(url);
@@ -287,16 +383,21 @@ async function load() {
   if (events.status === "fulfilled") renderEvents(events.value); else failed.push("calendar");
   if (sports.status === "fulfilled") renderSports(sports.value); else failed.push("sports");
 
+  loadPlaylist(); // no-op once tracks are loaded; retries each cycle if it failed
   status.textContent = failed.length ? `${failed.join(" + ")} unreachable` : "";
   status.classList.toggle("error", failed.length > 0);
   button.disabled = false;
 }
 
 $("refresh").addEventListener("click", load);
+$("playpause").addEventListener("click", togglePlay);
+$("next").addEventListener("click", playNext);
 // F5 is intercepted so it refetches data instead of reloading the page; also "R" and the remote's red key (403)
 document.addEventListener("keydown", (e) => {
   if (e.key === "F5") e.preventDefault();
   if (["F5", "r", "R", "ColorF0Red"].includes(e.key) || e.keyCode === 403) load();
+  else if (e.key === "p" || e.key === "P") togglePlay();
+  else if (e.key === "n" || e.key === "N") playNext();
 });
 
 tick();
