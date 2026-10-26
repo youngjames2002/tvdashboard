@@ -368,7 +368,9 @@ audio.addEventListener("error", () => {
 if ("mediaSession" in navigator) {
   // hardware/remote media keys arrive here rather than as keydown events
   navigator.mediaSession.setActionHandler("play", tryPlay);
-  navigator.mediaSession.setActionHandler("pause", () => { userPaused = true; audio.pause(); });
+  // OS-level pauses (KDE pausing players when the HDMI audio device vanishes) arrive here too,
+  // so they don't count as a user pause and the watchdog will resume them
+  navigator.mediaSession.setActionHandler("pause", () => audio.pause());
   navigator.mediaSession.setActionHandler("nexttrack", playNext);
 }
 
