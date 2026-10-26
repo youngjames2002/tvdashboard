@@ -19,7 +19,7 @@ ICAL_URL = os.environ["GCAL_ICAL_URL"]
 BASE_DIR = Path(__file__).parent
 SPORTS_FILE = BASE_DIR / "sports.json"
 MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", BASE_DIR / "music"))
-SPORTS_REFRESH_COOLDOWN = 600
+SPORTS_REFRESH_COOLDOWN = 30
 
 _refresh_lock = threading.Lock()
 _last_refresh = 0.0
