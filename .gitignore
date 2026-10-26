@@ -1,4 +1,8 @@
 .env
+.venv/
+__pycache__/
 test.py
-__pycache__/app.cpython-314.pyc
 music/*
+sports.json
+sports.tmp
+sports.log
