@@ -1,6 +1,8 @@
 import datetime as dt
 import os
 import json
+import threading
+import time
 from pathlib import Path
 from urllib.parse import quote
 
@@ -11,10 +13,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import fetch_sports
+
 ICAL_URL = os.environ["GCAL_ICAL_URL"]
 BASE_DIR = Path(__file__).parent
 SPORTS_FILE = BASE_DIR / "sports.json"
 MUSIC_DIR = Path(os.environ.get("MUSIC_DIR", BASE_DIR / "music"))
+SPORTS_REFRESH_COOLDOWN = 600
+
+_refresh_lock = threading.Lock()
+_last_refresh = 0.0
 
 app = FastAPI()
 app.mount("/music", StaticFiles(directory=MUSIC_DIR, check_dir=False), name="music")
@@ -55,6 +63,21 @@ def get_sports():
         return json.loads(SPORTS_FILE.read_text())
     except FileNotFoundError:
         raise HTTPException(status_code=503, detail="sports.json not generated yet; run fetch_sports.py")
+
+
+@app.post("/sports/refresh")
+def refresh_sports():
+    global _last_refresh
+    if time.monotonic() - _last_refresh < SPORTS_REFRESH_COOLDOWN:
+        return get_sports()
+    if not _refresh_lock.acquire(blocking=False):
+        return get_sports()
+    try:
+        _last_refresh = time.monotonic()
+        fetch_sports.main()
+    finally:
+        _refresh_lock.release()
+    return get_sports()
 
 
 @app.get("/playlist")

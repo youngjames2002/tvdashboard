@@ -379,6 +379,14 @@ async function getJSON(url) {
   return res.json();
 }
 
+async function retryStaleSports() {
+  // asks the server to re-fetch from ESPN; the server rate-limits this, so calling it every cycle is fine
+  try {
+    const res = await fetch("/sports/refresh", { method: "POST" });
+    if (res.ok) renderSports(await res.json());
+  } catch { /* keep showing the stale data */ }
+}
+
 async function load() {
   const button = $("refresh");
   if (button.disabled) return; // a fetch is already running
@@ -390,7 +398,10 @@ async function load() {
   const [events, sports] = await Promise.allSettled([getJSON(`/events?limit=${MAX_EVENTS}`), getJSON("/sports")]);
   const failed = [];
   if (events.status === "fulfilled") renderEvents(events.value); else failed.push("calendar");
-  if (sports.status === "fulfilled") renderSports(sports.value); else failed.push("sports");
+  if (sports.status === "fulfilled") {
+    renderSports(sports.value);
+    if ((sports.value.teams || []).some((t) => t.stale)) retryStaleSports();
+  } else failed.push("sports");
 
   loadPlaylist(); // no-op once tracks are loaded; retries each cycle if it failed
   status.textContent = failed.length ? `${failed.join(" + ")} unreachable` : "";
